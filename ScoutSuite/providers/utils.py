@@ -1,5 +1,6 @@
 import asyncio
 from hashlib import sha1
+from ScoutSuite.core.console import print_exception
 
 
 def get_non_provider_id(name):
@@ -15,7 +16,7 @@ def get_non_provider_id(name):
     return name_hash.hexdigest()
 
 
-def run_concurrently(function):
+def run_concurrently(function, scale_back=1):
     """
     Schedules the execution of function `function` in the default thread pool (referred as 'executor') that has been
     associated with the global event loop.
@@ -24,7 +25,22 @@ def run_concurrently(function):
     :return: an asyncio.Future to be awaited.
     """
 
-    return asyncio.get_event_loop().run_in_executor(executor=None, func=function)
+    try:
+        return asyncio.get_event_loop().run_in_executor(executor=None, func=function)
+    except Exception as e:
+        # FIXME this only supports AWS
+        # Determine whether the exception is due to API throttling.
+        throttled = (hasattr(e, 'response') and
+                     'Error' in e.response
+                     and e.response['Error']['Code'] in ['Throttling',
+                                                         'RequestLimitExceeded',
+                                                         'ThrottlingException'])
+        if throttled:
+            print_exception('Hitting API Rate Limiting, will retry in {}s'.format(scale_back+1))
+            asyncio.sleep(scale_back=scale_back+1)
+            return run_concurrently(function)  # FIXME shouldn't this be awaited?
+        else:
+            raise
 
 
 async def get_and_set_concurrently(get_and_set_funcs: [], entities: [], **kwargs):
