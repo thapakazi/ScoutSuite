@@ -1,0 +1,15 @@
+version: "3.7"
+
+services:
+  api:
+    build: .
+    # command: .docker/entry_point.sh
+    volumes:
+      - $PWD:/app
+    # depends_on:
+    #   - db
+    # restart: unless-stopped
+    env_file:
+      - .env
+    # ports:          # only for desperate times
+    # - 8080:8080   # avoid this all the times
